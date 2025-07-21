@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Patient - Church Clinic</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" onclick="window.location.href='index.html'">← Back to Home</button>
+            <h1>Add New Patient</h1>
+        </div>
+        
+        <form id="patientForm" class="patient-form">
+            <div class="form-group">
+                <label for="fullName">Full Name *</label>
+                <input type="text" id="fullName" name="fullName" required />
+            </div>
+            
+            <div class="form-group">
+                <label for="phoneNumber">Phone Number</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="e.g., 0241234567" />
+            </div>
+            
+            <div class="form-group">
+                <label for="address">Zone/Branch</label>
+                <textarea id="address" name="address" rows="3" placeholder="Enter full address"></textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" min="0" max="120" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender">
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="dateOfBirth">Date of Birth</label>
+                <input type="date" id="dateOfBirth" name="dateOfBirth" />
+            </div>
+            
+            <div class="form-group">
+                <label for="lastDiagnosis">Initial Diagnosis (Optional)</label>
+                <textarea id="lastDiagnosis" name="lastDiagnosis" rows="2" placeholder="Enter diagnosis if this is a visit"></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="cancel-btn" onclick="window.location.href='index.html'">Cancel</button>
+                <button type="submit" class="submit-btn">Add Patient</button>
+            </div>
+        </form>
+        
+        <div id="success" class="success hidden">
+            <p>Patient added successfully!</p>
+            <button onclick="window.location.href='lookup.html'">Search Patients</button>
+            <button onclick="resetForm()">Add Another Patient</button>
+        </div>
+        
+        <div id="error" class="error hidden"></div>
+        <div id="loading" class="loading hidden">Adding patient...</div>
+    </div>
+
+    <script src="add-patient.js"></script>
+</body>
+</html>

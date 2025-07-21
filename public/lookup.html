@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Lookup - Church Clinic</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" onclick="window.location.href='index.html'">← Back to Home</button>
+            <h1>Patient Lookup</h1>
+        </div>
+        
+        <div class="search-section">
+            <input type="text" id="searchInput" placeholder="Enter patient name..." />
+            <button id="searchBtn">Search Patient</button>
+        </div>
+        
+        <div id="loading" class="loading hidden">Searching...</div>
+        
+        <div id="results" class="results hidden">
+            <h2>Search Results</h2>
+            <div id="patientList"></div>
+        </div>
+        
+        <div id="noResults" class="no-results hidden">
+            <p>No patients found with that name.</p>
+            <button class="add-new-btn" id="addNewBtn">Add New Patient</button>
+        </div>
+
+
+    <script src="lookup.js"></script>
+</body>
+</html>

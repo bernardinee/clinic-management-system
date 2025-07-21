@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="welcome-section">
+            <h1>Tom's Clinic Management System</h1>
+            <p class="subtitle">Simple Patient Management for Community Care</p>
+        </div>
+        
+        <div class="action-buttons">
+            <button class="main-btn" onclick="window.location.href='lookup.html'">
+                <div class="btn-icon">🔍</div>
+                <div class="btn-text">
+                    <h3>Find Patient</h3>
+                    <p>Search for existing patient records</p>
+                </div>
+            </button>
+            
+            <button class="main-btn" onclick="window.location.href='add-patient.html'">
+                <div class="btn-icon">➕</div>
+                <div class="btn-text">
+                    <h3>Add New Patient</h3>
+                    <p>Register a new patient in the system</p>
+                </div>
+            </button>
+        </div>
+        
+        <div class="stats-section">
+            <h3>Quick Stats</h3>
+            <div id="stats" class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-number" id="totalPatients">Loading...</span>
+                    <span class="stat-label">Total Patients</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        fetch('/api/patients/count')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalPatients').textContent = data.count || 0;
+            })
+            .catch(err => {
+                document.getElementById('totalPatients').textContent = 'Error';
+            });
+    </script>
+</body>
+</html> 
