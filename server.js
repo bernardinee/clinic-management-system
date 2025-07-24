@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -12,11 +12,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 // Import database after middleware setup
-const db = require('./database');
+const { query, end } = require('./database');
 
 // Add new patient (POST route)
-app.post('/api/patients', (req, res) => {
-    console.log('Received patient data:', req.body); // Debug log
+app.post('/api/patients', async (req, res) => {
+    console.log('Received patient data:', req.body);
     
     const {
         full_name,
@@ -39,117 +39,97 @@ app.post('/api/patients', (req, res) => {
         return res.status(400).json({ error: 'Gender is required' });
     }
 
-    // Insert patient into database
-    const query = `
-        INSERT INTO patients (
-            full_name, 
-            phone_number, 
-            address, 
-            age, 
-            gender, 
-            date_of_birth, 
-            last_diagnosis
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
+    try {
+        // Insert patient into database
+        const result = await query(`
+            INSERT INTO patients (
+                full_name, 
+                phone_number, 
+                address, 
+                age, 
+                gender, 
+                date_of_birth, 
+                last_diagnosis
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+        `, [
+            full_name.trim(),
+            phone_number ? phone_number.trim() : null,
+            address ? address.trim() : null,
+            age || null,
+            gender,
+            date_of_birth || null,
+            initial_diagnosis ? initial_diagnosis.trim() : null
+        ]);
 
-    const values = [
-        full_name.trim(),
-        phone_number ? phone_number.trim() : null,
-        address ? address.trim() : null,
-        age || null,
-        gender,
-        date_of_birth || null,
-        initial_diagnosis ? initial_diagnosis.trim() : null  // Fixed: changed from last_diagnosis to initial_diagnosis
-    ];
+        console.log('Patient added successfully with ID:', result.rows[0].id);
 
-    console.log('Executing query with values:', values); // Debug log
-
-    db.run(query, values, function(err) {
-        if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to add patient to database: ' + err.message });
-        }
-
-        console.log('Patient added successfully with ID:', this.lastID); // Debug log
-
-        // Return success with the new patient ID
         res.status(201).json({
             success: true,
             message: 'Patient added successfully',
-            patientId: this.lastID
+            patientId: result.rows[0].id
         });
-    });
+    } catch (err) {
+        console.error('Database error:', err);
+        res.status(500).json({ error: 'Failed to add patient to database: ' + err.message });
+    }
 });
 
 // Search patients by name
-app.get('/api/patients/search', (req, res) => {
+app.get('/api/patients/search', async (req, res) => {
     const searchName = req.query.name;
     
     if (!searchName) {
         return res.status(400).json({ error: 'Name is required' });
     }
 
-    // Search for patients with names containing the search term
-    const query = `
-        SELECT *,
-               NULL as last_visit_date,
-               0 as visit_count
-        FROM patients 
-        WHERE full_name LIKE ? 
-        ORDER BY full_name
-    `;
-    
-    db.all(query, [`%${searchName}%`], (err, rows) => {
-        if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Database error: ' + err.message });
-        }
+    try {
+        const result = await query(`
+            SELECT *,
+                   NULL as last_visit_date,
+                   0 as visit_count
+            FROM patients 
+            WHERE full_name ILIKE $1 
+            ORDER BY full_name
+        `, [`%${searchName}%`]);
         
-        res.json({ patients: rows });
-    });
+        res.json({ patients: result.rows });
+    } catch (err) {
+        console.error('Database error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
 });
 
-// Get all patients (for testing and search)
-app.get('/api/patients', (req, res) => {
+// Get all patients
+app.get('/api/patients', async (req, res) => {
     const searchName = req.query.name;
     
-    if (searchName) {
-        // If there's a search parameter, search for patients
-        const query = `
-            SELECT *,
-                   NULL as last_visit_date,
-                   0 as visit_count
-            FROM patients 
-            WHERE full_name LIKE ? 
-            ORDER BY full_name
-        `;
-        
-        db.all(query, [`%${searchName}%`], (err, rows) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Database error: ' + err.message });
-            }
+    try {
+        if (searchName) {
+            const result = await query(`
+                SELECT *,
+                       NULL as last_visit_date,
+                       0 as visit_count
+                FROM patients 
+                WHERE full_name ILIKE $1 
+                ORDER BY full_name
+            `, [`%${searchName}%`]);
             
-            res.json(rows); // Return just the array for the search functionality
-        });
-    } else {
-        // Return all patients
-        const query = `
-            SELECT *,
-                   NULL as last_visit_date,
-                   0 as visit_count
-            FROM patients 
-            ORDER BY full_name
-        `;
-        
-        db.all(query, (err, rows) => {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Database error: ' + err.message });
-            }
+            res.json(result.rows);
+        } else {
+            const result = await query(`
+                SELECT *,
+                       NULL as last_visit_date,
+                       0 as visit_count
+                FROM patients 
+                ORDER BY full_name
+            `);
             
-            res.json({ patients: rows });
-        });
+            res.json({ patients: result.rows });
+        }
+    } catch (err) {
+        console.error('Database error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
     }
 });
 
@@ -157,54 +137,43 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.delete('/api/patients/:id', (req, res) => {
+app.delete('/api/patients/:id', async (req, res) => {
     const patientId = req.params.id;
     
     if (!patientId) {
         return res.status(400).json({ error: 'Patient ID is required' });
     }
 
-    const checkQuery = 'SELECT full_name FROM patients WHERE id = ?';
-    
-    db.get(checkQuery, [patientId], (err, row) => {
-        if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Database error: ' + err.message });
-        }
+    try {
+        // Check if patient exists
+        const checkResult = await query('SELECT full_name FROM patients WHERE id = $1', [patientId]);
         
-        if (!row) {
+        if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'Patient not found' });
         }
         
         // Delete the patient
-        const deleteQuery = 'DELETE FROM patients WHERE id = ?';
+        await query('DELETE FROM patients WHERE id = $1', [patientId]);
         
-        db.run(deleteQuery, [patientId], function(err) {
-            if (err) {
-                console.error('Database error:', err);
-                return res.status(500).json({ error: 'Failed to delete patient: ' + err.message });
-            }
-            
-            res.json({
-                success: true,
-                message: `Patient "${row.full_name}" has been deleted successfully`
-            });
+        res.json({
+            success: true,
+            message: `Patient "${checkResult.rows[0].full_name}" has been deleted successfully`
         });
-    });
+    } catch (err) {
+        console.error('Database error:', err);
+        res.status(500).json({ error: 'Failed to delete patient: ' + err.message });
+    }
 });
 
 // Get patient count for dashboard
-app.get('/api/patients/count', (req, res) => {
-    const query = 'SELECT COUNT(*) as count FROM patients';
-    
-    db.get(query, [], (err, row) => {
-        if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Database error: ' + err.message });
-        }
-        
-        res.json({ count: row.count });
-    });
+app.get('/api/patients/count', async (req, res) => {
+    try {
+        const result = await query('SELECT COUNT(*) as count FROM patients');
+        res.json({ count: result.rows[0].count });
+    } catch (err) {
+        console.error('Database error:', err);
+        res.status(500).json({ error: 'Database error: ' + err.message });
+    }
 });
 
 app.get('/api/health', (req, res) => {
@@ -214,7 +183,6 @@ app.get('/api/health', (req, res) => {
 const server = app.listen(PORT, () => {
     console.log('=================================');
     console.log(`✅ Server running on http://localhost:${PORT}`);
-    console.log('✅ Database connected successfully');
     console.log('🌐 Open your browser and go to http://localhost:3000');
     console.log('=================================');
 }).on('error', (err) => {
@@ -226,17 +194,16 @@ const server = app.listen(PORT, () => {
     process.exit(1);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     console.log('\n🔄 Shutting down server...');
-    server.close(() => {
+    server.close(async () => {
         console.log('✅ Server closed.');
-        db.close((err) => {
-            if (err) {
-                console.error('❌ Error closing database:', err);
-            } else {
-                console.log('✅ Database closed.');
-            }
-            process.exit(0);
-        });
+        try {
+            await end();
+            console.log('✅ Database connection pool closed.');
+        } catch (err) {
+            console.error('❌ Error closing database connection pool:', err);
+        }
+        process.exit(0);
     });
-}); 
+});
