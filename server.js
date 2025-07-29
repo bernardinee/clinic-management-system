@@ -5,11 +5,31 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enhanced CORS configuration for production
+const corsOptions = {
+    origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.CORS_ORIGIN || 'https://your-app-name.onrender.com']
+        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static('public'));
+
+// Security headers for production
+if (process.env.NODE_ENV === 'production') {
+    app.use((req, res, next) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'DENY');
+        res.setHeader('X-XSS-Protection', '1; mode=block');
+        res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+        next();
+    });
+}
 
 // Import database after middleware setup
 const { query, end } = require('./database');
@@ -28,15 +48,29 @@ app.post('/api/patients', async (req, res) => {
         initial_diagnosis
     } = req.body;
 
-    // Validation
+    // Enhanced validation
     if (!full_name || !full_name.trim()) {
         console.log('Validation error: Full name is required');
-        return res.status(400).json({ error: 'Full name is required' });
+        return res.status(400).json({ 
+            error: 'Full name is required',
+            field: 'full_name'
+        });
     }
 
     if (!gender) {
         console.log('Validation error: Gender is required');
-        return res.status(400).json({ error: 'Gender is required' });
+        return res.status(400).json({ 
+            error: 'Gender is required',
+            field: 'gender'
+        });
+    }
+
+    // Validate age if provided
+    if (age !== null && age !== undefined && (age < 0 || age > 150)) {
+        return res.status(400).json({
+            error: 'Age must be between 0 and 150',
+            field: 'age'
+        });
     }
 
     try {
@@ -51,7 +85,7 @@ app.post('/api/patients', async (req, res) => {
                 date_of_birth, 
                 last_diagnosis
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id
+            RETURNING id, full_name
         `, [
             full_name.trim(),
             phone_number ? phone_number.trim() : null,
@@ -67,15 +101,28 @@ app.post('/api/patients', async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Patient added successfully',
-            patientId: result.rows[0].id
+            patientId: result.rows[0].id,
+            patientName: result.rows[0].full_name
         });
     } catch (err) {
         console.error('Database error:', err);
-        res.status(500).json({ error: 'Failed to add patient to database: ' + err.message });
+        
+        // Handle specific PostgreSQL errors
+        if (err.code === '23505') { // Unique constraint violation
+            res.status(409).json({ 
+                error: 'A patient with this information already exists',
+                code: 'DUPLICATE_PATIENT'
+            });
+        } else {
+            res.status(500).json({ 
+                error: 'Failed to add patient to database',
+                code: 'DATABASE_ERROR'
+            });
+        }
     }
 });
 
-// Search patients by name
+// Search patients by name with enhanced filtering
 app.get('/api/patients/search', async (req, res) => {
     const searchName = req.query.name;
     
@@ -91,18 +138,26 @@ app.get('/api/patients/search', async (req, res) => {
             FROM patients 
             WHERE full_name ILIKE $1 
             ORDER BY full_name
+            LIMIT 50
         `, [`%${searchName}%`]);
         
-        res.json({ patients: result.rows });
+        res.json({ 
+            patients: result.rows,
+            total: result.rows.length,
+            searchTerm: searchName
+        });
     } catch (err) {
         console.error('Database error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
+        res.status(500).json({ error: 'Database error occurred' });
     }
 });
 
-// Get all patients
+// Get all patients with pagination support
 app.get('/api/patients', async (req, res) => {
     const searchName = req.query.name;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    const preview = req.query.preview === 'true';
     
     try {
         if (searchName) {
@@ -113,35 +168,37 @@ app.get('/api/patients', async (req, res) => {
                 FROM patients 
                 WHERE full_name ILIKE $1 
                 ORDER BY full_name
-            `, [`%${searchName}%`]);
+                LIMIT $2 OFFSET $3
+            `, [`%${searchName}%`, limit, offset]);
             
             res.json(result.rows);
         } else {
-            const result = await query(`
-                SELECT *,
-                       NULL as last_visit_date,
-                       0 as visit_count
-                FROM patients 
-                ORDER BY full_name
-            `);
+            const queryText = preview 
+                ? `SELECT *, NULL as last_visit_date, 0 as visit_count FROM patients ORDER BY created_at DESC LIMIT $1`
+                : `SELECT *, NULL as last_visit_date, 0 as visit_count FROM patients ORDER BY full_name LIMIT $1 OFFSET $2`;
             
-            res.json({ patients: result.rows });
+            const params = preview ? [limit] : [limit, offset];
+            const result = await query(queryText, params);
+            
+            res.json(result.rows);
         }
     } catch (err) {
         console.error('Database error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
+        res.status(500).json({ error: 'Database error occurred' });
     }
 });
 
+// Home route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Delete patient with enhanced error handling
 app.delete('/api/patients/:id', async (req, res) => {
     const patientId = req.params.id;
     
-    if (!patientId) {
-        return res.status(400).json({ error: 'Patient ID is required' });
+    if (!patientId || isNaN(patientId)) {
+        return res.status(400).json({ error: 'Valid patient ID is required' });
     }
 
     try {
@@ -157,11 +214,12 @@ app.delete('/api/patients/:id', async (req, res) => {
         
         res.json({
             success: true,
-            message: `Patient "${checkResult.rows[0].full_name}" has been deleted successfully`
+            message: `Patient "${checkResult.rows[0].full_name}" has been deleted successfully`,
+            deletedPatientName: checkResult.rows[0].full_name
         });
     } catch (err) {
         console.error('Database error:', err);
-        res.status(500).json({ error: 'Failed to delete patient: ' + err.message });
+        res.status(500).json({ error: 'Failed to delete patient' });
     }
 });
 
@@ -169,21 +227,59 @@ app.delete('/api/patients/:id', async (req, res) => {
 app.get('/api/patients/count', async (req, res) => {
     try {
         const result = await query('SELECT COUNT(*) as count FROM patients');
-        res.json({ count: result.rows[0].count });
+        res.json({ 
+            count: parseInt(result.rows[0].count),
+            timestamp: new Date().toISOString()
+        });
     } catch (err) {
         console.error('Database error:', err);
-        res.status(500).json({ error: 'Database error: ' + err.message });
+        res.status(500).json({ error: 'Database error occurred' });
     }
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
+// Enhanced health check endpoint
+app.get('/api/health', async (req, res) => {
+    try {
+        // Test database connection
+        await query('SELECT 1');
+        res.json({ 
+            status: 'OK',
+            server: 'running',
+            database: 'connected',
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV || 'development'
+        });
+    } catch (err) {
+        console.error('Health check failed:', err);
+        res.status(503).json({
+            status: 'ERROR',
+            server: 'running',
+            database: 'disconnected',
+            timestamp: new Date().toISOString(),
+            error: 'Database connection failed'
+        });
+    }
 });
 
-const server = app.listen(PORT, () => {
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: 'API endpoint not found' });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ 
+        error: 'Internal server error',
+        timestamp: new Date().toISOString()
+    });
+});
+
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('=================================');
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-    console.log('🌐 Open your browser and go to http://localhost:3000');
+    console.log(`✅ Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Access URL: http://localhost:${PORT}`);
     console.log('=================================');
 }).on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -194,10 +290,24 @@ const server = app.listen(PORT, () => {
     process.exit(1);
 });
 
+// Graceful shutdown
 process.on('SIGINT', async () => {
     console.log('\n🔄 Shutting down server...');
     server.close(async () => {
         console.log('✅ Server closed.');
+        try {
+            await end();
+            console.log('✅ Database connection pool closed.');
+        } catch (err) {
+            console.error('❌ Error closing database connection pool:', err);
+        }
+        process.exit(0);
+    });
+});
+
+process.on('SIGTERM', async () => {
+    console.log('\n🔄 Received SIGTERM, shutting down gracefully...');
+    server.close(async () => {
         try {
             await end();
             console.log('✅ Database connection pool closed.');
