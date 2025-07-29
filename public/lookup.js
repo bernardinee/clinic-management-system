@@ -1,8 +1,11 @@
-// Initialize DOM elements - will be set after DOM is loaded
+// Complete lookup.js - Replace your entire public/lookup.js with this
+console.log('Patient lookup script loading...');
+
+// Global variables
 let searchBtn, previewBtn, searchInput, patientList, results, loading, error;
 
 // Initialize DOM elements
-function initializeDOMElements() {
+function initDOM() {
     searchBtn = document.getElementById('searchBtn');
     previewBtn = document.getElementById('previewBtn');
     searchInput = document.getElementById('searchInput');
@@ -12,29 +15,13 @@ function initializeDOMElements() {
     error = document.getElementById('error');
 }
 
-// Check if required elements exist
-function checkRequiredElements() {
-    const requiredElements = {
-        searchBtn: searchBtn,
-        searchInput: searchInput,
-        patientList: patientList,
-        results: results,
-        loading: loading
-    };
-    
-    for (const [name, element] of Object.entries(requiredElements)) {
-        if (!element) {
-            console.error(`Required element '${name}' not found in DOM`);
-            return false;
-        }
-    }
-    return true;
-}
-
 // Search patients function
 async function searchPatients() {
+    console.log('🔍 Search patients called');
+    
     if (!searchInput) {
-        console.error('Search input element not found');
+        console.error('Search input not found');
+        showError('Search input not found on page');
         return;
     }
     
@@ -44,59 +31,90 @@ async function searchPatients() {
         return;
     }
 
+    console.log('Searching for:', name);
     hideAll();
     if (loading) loading.classList.remove('hidden');
 
     try {
-        const response = await fetch(`/api/patients?name=${encodeURIComponent(name)}`);
-        const patients = await response.json();
+        // Try primary search endpoint
+        let response = await fetch(`/api/patients?name=${encodeURIComponent(name)}`);
+        let patients = await response.json();
+        
+        console.log('Primary search response:', { status: response.status, ok: response.ok, data: patients });
+        
+        // Try alternative endpoint if first fails
+        if (!response.ok || !patients || patients.length === 0) {
+            console.log('Trying alternative search endpoint...');
+            response = await fetch(`/api/patients/search?name=${encodeURIComponent(name)}`);
+            const data = await response.json();
+            patients = data.patients || data;
+            console.log('Alternative search response:', { status: response.status, ok: response.ok, data: patients });
+        }
+        
         hideAll();
 
-        if (response.ok && patients.length > 0) {
+        if (response.ok && patients && patients.length > 0) {
+            console.log(`✅ Found ${patients.length} patients`);
             displayPatients(patients, 'Search Results');
         } else {
+            console.log('❌ No patients found');
             showNoResults();
         }
     } catch (err) {
         hideAll();
-        showError('An error occurred while searching. Please check if the server is running.');
         console.error('Search error:', err);
+        showError('Search failed. Please check if the server is running.');
     }
 }
 
-// Preview patients function - shows sample data from the system
+// Preview patients function
 async function previewPatients() {
+    console.log('👁️ Preview patients called');
+    
     hideAll();
     if (loading) loading.classList.remove('hidden');
 
     try {
-        // Fetch a sample of patients (you can modify the endpoint as needed)
-        const response = await fetch('/api/patients?limit=10&preview=true');
-        const patients = await response.json();
+        // Try to get some patients for preview
+        let response = await fetch('/api/patients?limit=10');
+        let patients = await response.json();
+        
+        console.log('Preview response:', { status: response.status, ok: response.ok, data: patients });
+        
+        // Handle different response formats
+        if (patients.patients && Array.isArray(patients.patients)) {
+            patients = patients.patients;
+        }
+        
         hideAll();
 
-        if (response.ok && patients.length > 0) {
+        if (response.ok && patients && patients.length > 0) {
+            console.log(`✅ Preview showing ${patients.length} patients`);
             displayPatients(patients, 'Preview - Sample Patient Records');
         } else {
+            console.log('❌ No patients found for preview');
             showNoResults('No patient records found in the system.');
         }
     } catch (err) {
         hideAll();
-        showError('An error occurred while loading preview. Please check if the server is running.');
         console.error('Preview error:', err);
+        showError('Preview failed. Please check if the server is running.');
     }
 }
 
-// Display patient cards with delete functionality
+// Display patients function
 function displayPatients(patients, title = 'Results') {
+    console.log(`📋 Displaying ${patients.length} patients`);
+    
     if (!patientList) {
         console.error('Patient list element not found');
+        showError('Patient list element not found on page');
         return;
     }
     
-    patientList.innerHTML = ''; // Clear previous results
+    patientList.innerHTML = '';
 
-    // Add a title section
+    // Add title
     const titleElement = document.createElement('div');
     titleElement.className = 'results-title';
     titleElement.innerHTML = `
@@ -105,17 +123,28 @@ function displayPatients(patients, title = 'Results') {
     `;
     patientList.appendChild(titleElement);
 
-    patients.forEach(patient => {
+    // Add patient cards
+    patients.forEach((patient, index) => {
+        console.log(`Creating card for patient ${index + 1}:`, patient.full_name);
+        
         const patientCard = document.createElement('div');
         patientCard.classList.add('patient-card');
         patientCard.setAttribute('data-patient-id', patient.id);
         
+        const patientName = patient.full_name || 'Unknown Name';
+        const safeName = patientName.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        
         patientCard.innerHTML = `
             <div class="patient-header">
-                <div class="patient-name">${patient.full_name}</div>
-                <button class="delete-btn" onclick="deletePatient(${patient.id}, '${patient.full_name.replace(/'/g, "\\'")}')">
-                    🗑️ Delete
-                </button>
+                <div class="patient-name">${patientName}</div>
+                <div class="patient-actions">
+                    <button class="edit-btn" onclick="editPatient(${patient.id})" title="Edit Patient">
+                        ✏️ Edit
+                    </button>
+                    <button class="delete-btn" onclick="deletePatient(${patient.id}, '${safeName}')" title="Delete Patient">
+                        🗑️ Delete
+                    </button>
+                </div>
             </div>
             <div class="patient-info">
                 <div class="info-item">
@@ -151,49 +180,65 @@ function displayPatients(patients, title = 'Results') {
                     <span class="info-value">${patient.last_diagnosis || 'None recorded'}</span>
                 </div>
             </div>
+            <div class="edit-form-container" id="editForm${patient.id}" style="display: none;">
+                <!-- Edit form will be injected here -->
+            </div>
         `;
+        
         patientList.appendChild(patientCard);
     });
 
     if (results) results.classList.remove('hidden');
+    console.log('✅ Patient display complete');
 }
 
-// Delete patient function
+// Delete patient function - MUST be global immediately
 async function deletePatient(patientId, patientName) {
+    console.log('🗑️ Delete patient called:', { patientId, patientName });
+    
     // Confirm deletion
     const confirmDelete = confirm(`Are you sure you want to delete "${patientName}"?\n\nThis action cannot be undone and will permanently remove all patient data.`);
     
     if (!confirmDelete) {
+        console.log('❌ Delete cancelled by user');
         return;
     }
 
-    // Show loading state on the specific patient card
     const patientCard = document.querySelector(`[data-patient-id="${patientId}"]`);
     if (!patientCard) {
         console.error(`Patient card with ID ${patientId} not found`);
+        showError('Patient card not found');
         return;
     }
     
     const deleteBtn = patientCard.querySelector('.delete-btn');
     if (!deleteBtn) {
         console.error('Delete button not found in patient card');
+        showError('Delete button not found');
         return;
     }
     
     const originalText = deleteBtn.innerHTML;
-    
     deleteBtn.innerHTML = '⏳ Deleting...';
     deleteBtn.disabled = true;
 
     try {
+        console.log(`Making DELETE request to /api/patients/${patientId}`);
         const response = await fetch(`/api/patients/${patientId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
+        console.log('Delete response status:', response.status);
         const result = await response.json();
+        console.log('Delete response data:', result);
 
         if (response.ok) {
-            // Remove the patient card with a fade out effect
+            console.log('✅ Delete successful');
+            
+            // Remove the card with animation
             patientCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
             patientCard.style.opacity = '0';
             patientCard.style.transform = 'translateX(-100%)';
@@ -201,159 +246,370 @@ async function deletePatient(patientId, patientName) {
             setTimeout(() => {
                 patientCard.remove();
                 
-                // Check if there are any patients left (excluding the title)
-                if (patientList) {
-                    const remainingCards = patientList.querySelectorAll('.patient-card');
-                    if (remainingCards.length === 0) {
-                        showNoResults('All patients have been removed from the results.');
-                    }
+                // Check if any patients remain
+                const remainingCards = document.querySelectorAll('.patient-card');
+                if (remainingCards.length === 0) {
+                    showNoResults('All patients have been removed from the results.');
                 }
             }, 300);
             
-            // Show success message
             showSuccessMessage(result.message || `Patient "${patientName}" deleted successfully`);
             
         } else {
-            // Restore button state
+            console.log('❌ Delete failed:', result.error);
+            
+            // Restore button
             deleteBtn.innerHTML = originalText;
             deleteBtn.disabled = false;
             showError(result.error || 'Failed to delete patient');
         }
     } catch (err) {
-        // Restore button state
+        console.error('❌ Delete network error:', err);
+        
+        // Restore button
         deleteBtn.innerHTML = originalText;
         deleteBtn.disabled = false;
         showError('Network error. Please check if the server is running.');
-        console.error('Delete error:', err);
     }
 }
 
-// Make functions available globally
-window.deletePatient = deletePatient;
-window.previewPatients = previewPatients;
+// Edit patient function - MUST be global immediately
+async function editPatient(patientId) {
+    console.log('✏️ Edit patient called:', patientId);
+    
+    const patientCard = document.querySelector(`[data-patient-id="${patientId}"]`);
+    if (!patientCard) {
+        showError('Patient card not found');
+        return;
+    }
+    
+    const editFormContainer = patientCard.querySelector(`#editForm${patientId}`);
+    if (!editFormContainer) {
+        showError('Edit form container not found');
+        return;
+    }
+    
+    // Toggle form visibility
+    if (editFormContainer.style.display !== 'none') {
+        editFormContainer.style.display = 'none';
+        console.log('📝 Edit form closed');
+        return;
+    }
+    
+    try {
+        console.log(`Fetching patient data for edit: /api/patients/${patientId}`);
+        const response = await fetch(`/api/patients/${patientId}`);
+        const result = await response.json();
+        
+        console.log('Edit fetch response:', { status: response.status, data: result });
+        
+        if (!response.ok) {
+            showError('Failed to load patient data for editing');
+            return;
+        }
+        
+        const patient = result.patient || result;
+        
+        if (!patient) {
+            showError('Patient data not found');
+            return;
+        }
+        
+        console.log('📝 Creating edit form for:', patient.full_name);
+        
+        // Create edit form
+        editFormContainer.innerHTML = `
+            <div class="edit-form">
+                <h3>Edit ${patient.full_name || 'Patient'}</h3>
+                <form id="editPatientForm${patientId}">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            <input type="text" name="fullName" value="${patient.full_name || ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="tel" name="phoneNumber" value="${patient.phone_number || ''}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Age</label>
+                            <input type="number" name="age" min="0" max="120" value="${patient.age || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender *</label>
+                            <select name="gender" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male" ${patient.gender === 'Male' ? 'selected' : ''}>Male</option>
+                                <option value="Female" ${patient.gender === 'Female' ? 'selected' : ''}>Female</option>
+                                <option value="Other" ${patient.gender === 'Other' ? 'selected' : ''}>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input type="text" name="address" value="${patient.address || ''}">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date of Birth</label>
+                            <input type="date" name="dateOfBirth" value="${patient.date_of_birth || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Last Diagnosis</label>
+                            <input type="text" name="lastDiagnosis" value="${patient.last_diagnosis || ''}">
+                        </div>
+                    </div>
+                    <div class="edit-form-actions">
+                        <button type="button" class="cancel-edit-btn" onclick="cancelEdit(${patientId})">
+                            ❌ Cancel
+                        </button>
+                        <button type="submit" class="save-btn">
+                            💾 Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        
+        editFormContainer.style.display = 'block';
+        
+        // Add form submit handler
+        const editForm = document.getElementById(`editPatientForm${patientId}`);
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await savePatientEdit(patientId, editForm);
+        });
+        
+        console.log('✅ Edit form created and displayed');
+        
+    } catch (err) {
+        console.error('Edit form creation error:', err);
+        showError('Failed to load patient data for editing');
+    }
+}
 
-// Show success message
+// Cancel edit function - MUST be global immediately
+function cancelEdit(patientId) {
+    console.log('❌ Cancel edit called:', patientId);
+    const editFormContainer = document.querySelector(`#editForm${patientId}`);
+    if (editFormContainer) {
+        editFormContainer.style.display = 'none';
+        editFormContainer.innerHTML = '';
+    }
+}
+
+// Save patient edit function
+async function savePatientEdit(patientId, editForm) {
+    console.log('💾 Save patient edit called:', patientId);
+    
+    const saveBtn = editForm.querySelector('.save-btn');
+    const originalText = saveBtn.innerHTML;
+    
+    saveBtn.innerHTML = '⏳ Saving...';
+    saveBtn.disabled = true;
+    
+    try {
+        const formData = new FormData(editForm);
+        const patientData = {
+            full_name: formData.get('fullName').trim(),
+            phone_number: formData.get('phoneNumber').trim(),
+            address: formData.get('address').trim(),
+            age: formData.get('age') ? parseInt(formData.get('age')) : null,
+            gender: formData.get('gender'),
+            date_of_birth: formData.get('dateOfBirth'),
+            last_diagnosis: formData.get('lastDiagnosis').trim()
+        };
+        
+        if (!patientData.full_name) {
+            throw new Error('Full name is required');
+        }
+        
+        console.log('Saving patient data:', patientData);
+        
+        const response = await fetch(`/api/patients/${patientId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patientData)
+        });
+        
+        const result = await response.json();
+        console.log('Save response:', { status: response.status, data: result });
+        
+        if (response.ok) {
+            console.log('✅ Patient saved successfully');
+            showSuccessMessage(`Patient "${patientData.full_name}" updated successfully`);
+            cancelEdit(patientId);
+            
+            // Update the patient card display
+            updatePatientCardDisplay(patientId, patientData);
+            
+        } else {
+            throw new Error(result.error || 'Failed to update patient');
+        }
+        
+    } catch (err) {
+        console.error('Save error:', err);
+        showError(err.message || 'Failed to save patient changes');
+    } finally {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    }
+}
+
+// Update patient card display after edit
+function updatePatientCardDisplay(patientId, patientData) {
+    const patientCard = document.querySelector(`[data-patient-id="${patientId}"]`);
+    if (!patientCard) return;
+    
+    // Update patient name
+    const nameElement = patientCard.querySelector('.patient-name');
+    if (nameElement) {
+        nameElement.textContent = patientData.full_name;
+    }
+    
+    // Update info values
+    const infoItems = patientCard.querySelectorAll('.info-item');
+    infoItems.forEach(item => {
+        const label = item.querySelector('.info-label').textContent.toLowerCase();
+        const valueElement = item.querySelector('.info-value');
+        
+        if (label.includes('phone')) {
+            valueElement.textContent = patientData.phone_number || 'Not provided';
+        } else if (label.includes('location')) {
+            valueElement.textContent = patientData.address || 'Not provided';
+        } else if (label.includes('age')) {
+            valueElement.textContent = patientData.age || 'Not provided';
+        } else if (label.includes('gender')) {
+            valueElement.textContent = patientData.gender || 'Not provided';
+        } else if (label.includes('birth')) {
+            valueElement.textContent = patientData.date_of_birth || 'Not provided';
+        } else if (label.includes('diagnosis')) {
+            valueElement.textContent = patientData.last_diagnosis || 'None recorded';
+        }
+    });
+    
+    console.log('✅ Patient card display updated');
+}
+
+// Utility functions
 function showSuccessMessage(message) {
-    // Create or update success message element
+    console.log('✅ Success:', message);
+    
     let successElement = document.getElementById('success-message');
     if (!successElement) {
         successElement = document.createElement('div');
         successElement.id = 'success-message';
-        successElement.className = 'success-message';
+        successElement.style.cssText = `
+            padding: 10px;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            margin: 10px 0;
+            text-align: center;
+        `;
         
-        const container = document.querySelector('.container');
-        if (container && results) {
-            container.insertBefore(successElement, results);
-        } else {
-            // Fallback: append to body if container not found
-            document.body.appendChild(successElement);
-        }
+        const container = document.querySelector('.container') || document.body;
+        container.insertBefore(successElement, container.firstChild);
     }
     
     successElement.textContent = message;
-    successElement.classList.remove('hidden');
+    successElement.style.display = 'block';
     
-    // Auto hide after 3 seconds
     setTimeout(() => {
-        successElement.classList.add('hidden');
+        successElement.style.display = 'none';
     }, 3000);
 }
 
-// Show no results message
 function showNoResults(customMessage = null) {
-    if (!patientList) {
-        console.error('Patient list element not found');
-        return;
-    }
+    if (!patientList) return;
     
-    patientList.innerHTML = `<div class="no-results">${customMessage || 'No patients found with that name'}</div>`;
+    const message = customMessage || 'No patients found with that name';
+    console.log('📭 No results:', message);
+    
+    patientList.innerHTML = `
+        <div class="no-results" style="text-align: center; padding: 20px; color: #666; font-style: italic;">
+            ${message}
+        </div>
+    `;
     if (results) results.classList.remove('hidden');
 }
 
-// Show error message with null check
 function showError(message) {
-    // If error element doesn't exist, create it dynamically
-    if (!error) {
-        const errorElement = document.createElement('div');
+    console.error('❌ Error:', message);
+    
+    let errorElement = error;
+    
+    if (!errorElement) {
+        errorElement = document.createElement('div');
         errorElement.id = 'error';
-        errorElement.className = 'error-message';
+        errorElement.style.cssText = `
+            padding: 10px;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            margin: 10px 0;
+            text-align: center;
+        `;
         
-        // Try to insert it in a logical place
         const container = document.querySelector('.container') || document.body;
         const searchInput = document.getElementById('searchInput');
         
-        if (searchInput && container.contains(searchInput)) {
-            container.insertBefore(errorElement, searchInput.nextSibling);
+        if (searchInput && searchInput.parentNode) {
+            searchInput.parentNode.insertBefore(errorElement, searchInput.nextSibling);
         } else {
             container.appendChild(errorElement);
         }
         
-        errorElement.textContent = message;
-        errorElement.classList.remove('hidden');
-        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        
-        // Auto hide after 5 seconds
-        setTimeout(() => {
-            errorElement.classList.add('hidden');
-        }, 5000);
-        
-        return;
+        error = errorElement;
     }
     
-    error.textContent = message;
-    error.classList.remove('hidden');
-    error.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
     
-    // Auto hide after 5 seconds
     setTimeout(() => {
-        error.classList.add('hidden');
+        if (errorElement) errorElement.style.display = 'none';
     }, 5000);
 }
 
-// Hide all results and loading states
 function hideAll() {
     if (loading) loading.classList.add('hidden');
     if (results) results.classList.add('hidden');
-    if (error) error.classList.add('hidden');
+    if (error) error.style.display = 'none';
     
     const successMessage = document.getElementById('success-message');
-    if (successMessage) {
-        successMessage.classList.add('hidden');
-    }
+    if (successMessage) successMessage.style.display = 'none';
 }
 
-// Event listeners for search (with null checks)
-if (searchBtn) {
-    searchBtn.addEventListener('click', searchPatients);
-}
+// CRITICAL: Make functions globally available IMMEDIATELY (before DOM loads)
+window.deletePatient = deletePatient;
+window.editPatient = editPatient;
+window.cancelEdit = cancelEdit;
+window.searchPatients = searchPatients;
+window.previewPatients = previewPatients;
 
-if (searchInput) {
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            searchPatients();
-        }
-    });
-
-    searchInput.addEventListener('input', () => {
-        if (searchInput.value.trim() === '') {
-            hideAll();
-        }
-    });
-}
-
-// Focus on search input when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize DOM elements first
-    initializeDOMElements();
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM loaded, initializing patient lookup...');
     
-    // Check if all required elements exist
-    if (!checkRequiredElements()) {
-        console.warn('Some required DOM elements are missing. Please check your HTML structure.');
-    }
+    initDOM();
     
-    // Set up event listeners after elements are initialized
+    // Set up event listeners
     if (searchBtn) {
         searchBtn.addEventListener('click', searchPatients);
+        console.log('✅ Search button listener added');
+    } else {
+        console.warn('⚠️ Search button not found');
+    }
+
+    if (previewBtn) {
+        previewBtn.addEventListener('click', previewPatients);
+        console.log('✅ Preview button listener added');
+    } else {
+        console.log('ℹ️ Preview button not found (optional)');
     }
 
     if (searchInput) {
@@ -369,7 +625,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Focus on search input
         searchInput.focus();
+        console.log('✅ Search input listeners added');
+    } else {
+        console.warn('⚠️ Search input not found');
     }
+    
+    console.log('🎉 Patient lookup system initialized successfully');
+    
+    // Test global functions
+    console.log('🔧 Testing global functions:');
+    console.log('- deletePatient:', typeof window.deletePatient);
+    console.log('- editPatient:', typeof window.editPatient);
+    console.log('- cancelEdit:', typeof window.cancelEdit);
 });
+
+console.log('📋 Patient lookup script loaded successfully');

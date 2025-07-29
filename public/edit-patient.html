@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Patient - Church Clinic</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="navigation">
+            <a href="/" class="nav-button">🏠 Home</a>
+            <a href="/add-patient.html" class="nav-button">➕ Add Patient</a>
+            <a href="/lookup.html" class="nav-button">🔍 Search Patients</a>
+        </nav>
+
+        <header>
+            <h1>✏️ Edit Patient Information</h1>
+            <p>Update patient details below</p>
+        </header>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Loading patient information...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error" class="error-message hidden">
+            <p>Error message will appear here</p>
+        </div>
+
+        <!-- Success Message -->
+        <div id="success" class="success-message hidden">
+            <div class="success-content">
+                <h3>✅ Patient Updated Successfully!</h3>
+                <p>The patient information has been updated in the database.</p>
+                <div class="success-actions">
+                    <button onclick="editAnother()" class="btn btn-primary">Edit Another Patient</button>
+                    <a href="/lookup.html" class="btn btn-secondary">Back to Search</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Form -->
+        <form id="editPatientForm" class="patient-form">
+            <input type="hidden" id="patientId" name="patientId">
+            
+            <div class="form-group">
+                <label for="fullName">Full Name *</label>
+                <input type="text" id="fullName" name="fullName" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="phoneNumber">Phone Number</label>
+                    <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="+233 XX XXX XXXX">
+                </div>
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" min="0" max="150">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="address">Address/Location</label>
+                <textarea id="address" name="address" rows="2" placeholder="Enter patient's address"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="gender">Gender *</label>
+                    <select id="gender" name="gender" required>
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="dateOfBirth">Date of Birth</label>
+                    <input type="date" id="dateOfBirth" name="dateOfBirth">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="lastDiagnosis">Last Diagnosis</label>
+                <textarea id="lastDiagnosis" name="lastDiagnosis" rows="3" placeholder="Enter last diagnosis or medical notes"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">💾 Update Patient</button>
+                <button type="button" onclick="cancelEdit()" class="btn btn-secondary">❌ Cancel</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="edit-patient.js"></script>
+</body>
+</html>

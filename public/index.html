@@ -39,18 +39,64 @@
                     <span class="stat-label">Total Patients</span>
                 </div>
             </div>
+            
+            <!-- Refresh button for manual stats refresh -->
+            <div style="text-align: center; margin-top: 15px;">
+                <button onclick="refreshStats()" style="
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                ">
+                    🔄 Refresh Stats
+                </button>
+            </div>
         </div>
     </div>
 
+    <!-- Load the script files -->
+    <script src="script.js"></script>
     <script>
-        fetch('/api/patients/count')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('totalPatients').textContent = data.count || 0;
-            })
-            .catch(err => {
+        // Function to load and display quick stats
+        async function loadQuickStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (response.ok) {
+                    const stats = await response.json();
+                    console.log('Received stats:', stats); // Debug log
+                    
+                    // Update only the total patients count
+                    document.getElementById('totalPatients').textContent = stats.totalPatients || '0';
+                } else {
+                    console.error('Response not OK:', response.status, response.statusText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                // Show error state
                 document.getElementById('totalPatients').textContent = 'Error';
-            });
+            }
+        }
+
+        // Function to refresh stats manually
+        function refreshStats() {
+            // Show loading state
+            document.getElementById('totalPatients').textContent = 'Loading...';
+            
+            // Load fresh stats
+            loadQuickStats();
+        }
+
+        // Load stats when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadQuickStats();
+            
+            // Auto-refresh stats every 30 seconds
+            setInterval(loadQuickStats, 30000);
+        });
     </script>
 </body>
-</html> 
+</html>

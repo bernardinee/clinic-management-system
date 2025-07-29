@@ -207,7 +207,6 @@ h1 {
     background-color: #1e3d6f;
 }
 
-
 /* Patient Card Styles */
 .patient-card {
     border: 1px solid #ddd;
@@ -232,6 +231,44 @@ h1 {
     font-weight: bold;
     color: #2c5aa0;
     margin: 0;
+}
+
+.patient-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.edit-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.edit-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0056b3, #007bff);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.4);
+}
+
+.edit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.edit-btn:active:not(:disabled) {
+    transform: translateY(0);
 }
 
 .delete-btn {
@@ -286,6 +323,141 @@ h1 {
 
 .info-value {
     color: #333;
+}
+
+/* Edit Form Styles */
+.edit-form {
+    background-color: #f8f9fa;
+    border: 2px solid #007bff;
+    border-radius: 10px;
+    padding: 25px;
+    margin-top: 15px;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.1);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-15px);
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 1000px;
+    }
+}
+
+.edit-form h3 {
+    color: #007bff;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 18px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.edit-form .form-group {
+    margin-bottom: 15px;
+}
+
+.edit-form .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.edit-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+}
+
+.edit-form input,
+.edit-form select,
+.edit-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background-color: white;
+}
+
+.edit-form input:focus,
+.edit-form select:focus,
+.edit-form textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    background-color: #fff;
+}
+
+.edit-form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #dee2e6;
+}
+
+.save-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #28a745, #20a83a);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.save-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #20a83a, #28a745);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.cancel-edit-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(108, 117, 125, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.cancel-edit-btn:hover {
+    background: linear-gradient(135deg, #5a6268, #6c757d);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(108, 117, 125, 0.4);
+}
+
+.cancel-edit-btn:active {
+    transform: translateY(0);
 }
 
 /* Success Message Styles */
@@ -492,8 +664,28 @@ h1 {
         grid-template-columns: 1fr;
     }
     
+    .edit-form .form-row {
+        grid-template-columns: 1fr;
+    }
+    
     .form-actions {
         flex-direction: column;
+    }
+    
+    .edit-form-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .patient-actions {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+    
+    .edit-btn,
+    .delete-btn {
+        justify-content: center;
     }
     
     .header {
