@@ -8,8 +8,8 @@ const PORT = process.env.PORT || 3000;
 // Enhanced CORS configuration for production
 const corsOptions = {
     origin: process.env.NODE_ENV === 'production' 
-        ? [process.env.CORS_ORIGIN || 'https://your-app-name.onrender.com']
-        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+        ? process.env.CORS_ORIGIN || true
+        : true,
     credentials: true,
     optionsSuccessStatus: 200
 };
@@ -122,7 +122,7 @@ app.post('/api/patients', async (req, res) => {
     }
 });
 
-// Search patients by name with enhanced filtering
+// Search patients by name
 app.get('/api/patients/search', async (req, res) => {
     const searchName = req.query.name;
     
@@ -152,7 +152,7 @@ app.get('/api/patients/search', async (req, res) => {
     }
 });
 
-// Get all patients with pagination support
+// Get all patients
 app.get('/api/patients', async (req, res) => {
     const searchName = req.query.name;
     const limit = parseInt(req.query.limit) || 50;
@@ -193,7 +193,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Delete patient with enhanced error handling
+// Delete patient
 app.delete('/api/patients/:id', async (req, res) => {
     const patientId = req.params.id;
     
