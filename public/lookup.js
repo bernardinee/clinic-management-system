@@ -152,7 +152,7 @@ function displayPatients(patients, title = 'Results') {
                     <span class="info-value">${patient.phone_number || 'Not provided'}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Location:</span>
+                    <span class="info-label">Zone/Branch:</span>
                     <span class="info-value">${patient.address || 'Not provided'}</span>
                 </div>
                 <div class="info-item">
