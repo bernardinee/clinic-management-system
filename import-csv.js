@@ -55,6 +55,11 @@ async function importFromCSV(csvFilePath) {
     console.log(`📊 Found ${patients.length} patients in CSV file.`);
     console.log('🌱 Starting import...');
     
+    // Clear existing data before importing
+    console.log('🗑️  Clearing existing data...');
+    await client.query('DELETE FROM patients');
+    console.log('✅ Cleared existing data');
+    
     let successCount = 0;
     let errorCount = 0;
     
