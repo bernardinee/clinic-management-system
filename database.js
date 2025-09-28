@@ -5,26 +5,28 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
-// Debug logging - REMOVE AFTER FIXING
-console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
-console.log('🔍 DATABASE_URL exists:', !!process.env.DATABASE_URL);
-if (process.env.DATABASE_URL) {
-  console.log('🔍 DATABASE_URL starts with:', process.env.DATABASE_URL.substring(0, 30));
-}
+// Force Supabase URL in production - TEMPORARY FIX FOR INTERVIEW
+const DATABASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'postgresql://postgres:okrahbernardine123@db.brtdvkdejsddxazkwjht.supabase.co:5432/postgres'
+  : process.env.DATABASE_URL;
+
+// Debug logging
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('Using DATABASE_URL starts with:', DATABASE_URL ? DATABASE_URL.substring(0, 30) : 'NONE');
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 // Test the connection
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
-    console.error('❌ Error connecting to PostgreSQL:', err.message);
+    console.error('Error connecting to PostgreSQL:', err.message);
     process.exit(1);
   } else {
-    console.log('✅ Connected to PostgreSQL database at:', res.rows[0].now);
+    console.log('Connected to PostgreSQL database at:', res.rows[0].now);
   }
 });
 
@@ -46,7 +48,7 @@ async function initializeDatabase() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Patients table ready');
+    console.log('Patients table ready');
 
     // Create visits table
     await pool.query(`
@@ -60,9 +62,9 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('✅ Visits table ready');
+    console.log('Visits table ready');
   } catch (err) {
-    console.error('❌ Error creating tables:', err.message);
+    console.error('Error creating tables:', err.message);
     process.exit(1);
   }
 }
