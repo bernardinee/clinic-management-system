@@ -1,5 +1,9 @@
 const { Pool } = require('pg');
-
+// Debug all environment variables
+console.log('All DATABASE related env vars:');
+Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('DB')).forEach(key => {
+  console.log(`${key}: ${process.env[key]?.substring(0, 40)}...`);
+});
 // Only load .env file in development
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
