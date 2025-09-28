@@ -1,12 +1,16 @@
-// const { Pool } = require('pg');
-// require('dotenv').config(); // For local development with .env file
 const { Pool } = require('pg');
+
 // Only load .env file in development
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
-
+// Debug logging - REMOVE AFTER FIXING
+console.log('🔍 NODE_ENV:', process.env.NODE_ENV);
+console.log('🔍 DATABASE_URL exists:', !!process.env.DATABASE_URL);
+if (process.env.DATABASE_URL) {
+  console.log('🔍 DATABASE_URL starts with:', process.env.DATABASE_URL.substring(0, 30));
+}
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
