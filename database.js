@@ -1,5 +1,12 @@
+// const { Pool } = require('pg');
+// require('dotenv').config(); // For local development with .env file
 const { Pool } = require('pg');
-require('dotenv').config(); // For local development with .env file
+// Only load .env file in development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
+
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
